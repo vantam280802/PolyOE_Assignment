@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Chat - Websockets</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* ============ DESIGN TOKENS (đồng bộ hệ thống) ============ */
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --primary-light: #EEF2FF;
+            --accent: #EC4899;
+
+            --bg-gradient: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 45%, #fdf2f8 100%);
+            --card-bg: rgba(255, 255, 255, 0.9);
+            --card-border: rgba(255, 255, 255, 0.6);
+
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --text-faint: #9ca3af;
+
+            --border: #e5e7eb;
+
+            --radius-sm: 10px;
+            --radius-md: 16px;
+            --radius-lg: 24px;
+
+            --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+            --shadow-md: 0 10px 15px -3px rgba(79, 70, 229, 0.12), 0 4px 6px -2px rgba(79, 70, 229, 0.05);
+            --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.03);
+
+            --ease: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-gradient);
+            background-attachment: fixed;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 24px;
+            color: var(--text-main);
+        }
+
+        .container {
+            background: var(--card-bg);
+            width: 100%;
+            max-width: 460px;
+            padding: 32px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--card-border);
+        }
+
+        h2 {
+            text-align: center;
+            background: linear-gradient(to right, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 24px;
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+        }
+
+        /* ============ LOGIN AREA ============ */
+        #loginArea {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        #loginArea input {
+            padding: 13px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.25s var(--ease);
+            width: 100%;
+        }
+
+        #loginArea input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+        }
+
+        #loginArea button {
+            padding: 13px 20px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            color: #fff;
+            background: linear-gradient(to right, var(--primary), #6366f1);
+            box-shadow: var(--shadow-sm);
+            transition: all 0.25s var(--ease);
+        }
+
+        #loginArea button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3);
+        }
+
+        /* ============ CHAT AREA ============ */
+        #chatArea {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 14px;
+            padding: 10px 14px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+        }
+
+        .status-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+            flex-shrink: 0;
+        }
+
+        .status-bar strong {
+            color: var(--text-main);
+            font-weight: 700;
+        }
+
+        #messages {
+            height: 340px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            margin-bottom: 14px;
+            background-color: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #messages::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 999px;
+        }
+
+        /* Tin nhắn hệ thống */
+        .system-msg {
+            align-self: center;
+            color: var(--text-faint);
+            font-style: italic;
+            font-size: 12.5px;
+            background: #eef2f7;
+            padding: 5px 12px;
+            border-radius: 999px;
+            max-width: 90%;
+            text-align: center;
+        }
+
+        /* Tin nhắn người dùng - dạng bong bóng chat */
+        .user-msg {
+            align-self: flex-start;
+            max-width: 78%;
+            background: #ffffff;
+            border: 1px solid var(--border);
+            padding: 9px 14px;
+            border-radius: 14px 14px 14px 4px;
+            font-size: 14.5px;
+            color: var(--text-main);
+            box-shadow: var(--shadow-sm);
+            word-wrap: break-word;
+        }
+
+        .user-msg .sender-name {
+            display: block;
+            font-weight: 700;
+            font-size: 12.5px;
+            color: var(--primary);
+            margin-bottom: 2px;
+        }
+
+        /* Tin nhắn của chính mình - lệch phải, tô màu primary */
+        .user-msg.own {
+            align-self: flex-end;
+            background: linear-gradient(to right, var(--primary), #6366f1);
+            color: #ffffff;
+            border: none;
+            border-radius: 14px 14px 4px 14px;
+        }
+
+        .user-msg.own .sender-name {
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        /* ============ Ô NHẬP TIN NHẮN ============ */
+        .input-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-row input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.25s var(--ease);
+        }
+
+        .input-row input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+        }
+
+        .input-row button {
+            padding: 12px 22px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            color: #fff;
+            background-color: var(--primary);
+            box-shadow: var(--shadow-sm);
+            transition: all 0.25s var(--ease);
+            white-space: nowrap;
+        }
+
+        .input-row button:hover {
+            background-color: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.3);
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 22px 18px;
+            }
+            #messages {
+                height: 280px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Phòng Chat Nâng Cao (JSON)</h2>
+
+        <div id="loginArea">
+            <input type="text" id="username" placeholder="Nhập tên của bạn...">
+            <button onclick="init()">Tham gia phòng</button>
+        </div>
+
+        <div id="chatArea" style="display:none;">
+            <div class="status-bar">
+                <span class="status-dot"></span>
+                Số người online: <strong id="onlineCount">0</strong>
+            </div>
+
+            <div id="messages"></div>
+
+            <div class="input-row">
+                <input type="text" id="message" placeholder="Nhập tin nhắn...">
+                <button onclick="send()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        var websocket = null;
+        var currentUser = "";
+
+        function init() {
+            currentUser = document.getElementById("username").value.trim();
+            if(!currentUser) {
+                alert("Vui lòng nhập tên!"); return;
+            }
+
+            var wsUri = "ws://" + document.location.host + "/PolyOE_Project/json/chat/" + encodeURIComponent(currentUser);
+            websocket = new WebSocket(wsUri);
+
+            websocket.onopen = function(resp) {
+                document.getElementById("loginArea").style.display = "none";
+                document.getElementById("chatArea").style.display = "block";
+            };
+
+            websocket.onmessage = function(resp) {
+                // Parse JSON string thành Javascript Object
+                var msgObj = JSON.parse(resp.data);
+
+                // Cập nhật số người online
+                if(msgObj.count !== null && msgObj.count !== undefined) {
+                    document.getElementById('onlineCount').innerText = msgObj.count;
+                }
+
+                // Xây dựng dòng tin nhắn dựa vào type
+                var p = document.createElement("p");
+                if (msgObj.type === 0 || msgObj.type === 1) {
+                    p.className = "system-msg";
+                    p.innerText = "Hệ thống: " + msgObj.sender + " " + msgObj.text;
+                } else if (msgObj.type === 2) {
+                    p.className = "user-msg" + (msgObj.sender === currentUser ? " own" : "");
+                    var senderSpan = document.createElement("span");
+                    senderSpan.className = "sender-name";
+                    senderSpan.innerText = msgObj.sender;
+                    p.appendChild(senderSpan);
+                    p.appendChild(document.createTextNode(msgObj.text));
+                }
+
+                var msgDiv = document.getElementById('messages');
+                msgDiv.appendChild(p);
+                msgDiv.scrollTop = msgDiv.scrollHeight;
+            };
+        }
+
+        function send() {
+            var messageInput = document.getElementById("message");
+            if (messageInput.value.trim() !== "") {
+                // Đóng gói đối tượng JSON (type 2: tin nhắn bình thường)
+                var msgObj = {
+                    text: messageInput.value,
+                    type: 2,
+                    sender: currentUser,
+                    count: 0
+                };
+                // Chuyển đối tượng thành chuỗi JSON trước khi gửi
+                websocket.send(JSON.stringify(msgObj));
+                messageInput.value = "";
+            }
+        }
+    </script>
+</body>
+</html>
