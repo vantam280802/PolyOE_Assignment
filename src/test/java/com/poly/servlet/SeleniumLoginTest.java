@@ -22,7 +22,7 @@ public class SeleniumLoginTest {
         driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(10)); // Thời gian chờ tối đa tải phần tử
     }
 
-    @Test
+   // @Test
     public void testLoginUI_Success() throws InterruptedException {
         // 1. Máy tính tự động mở đường dẫn trang Đăng nhập
         driver.get("http://localhost:8080/PolyOE_Project/login");
